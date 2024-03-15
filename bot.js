@@ -73,30 +73,42 @@ bot.on('message', (msg) => {
         db.run(insertQuery, [telegramId, telegramName], err => err && console.error('插入数据库时出错:', err));
     }
 
-
     if (chatId == ADMIN_ID && msg.reply_to_message && msg.reply_to_message.forward_from) {
         const originalUserId = msg.reply_to_message.forward_from.id;
         let actionMessage;
         let blacklistStatus;
+        if (msg.text != null) {
+            if (msg.text === COMMAND_BAN) {
+                actionMessage = `用户 ID: ${originalUserId} 已被封禁.`;
+                blacklistStatus = 1;
+            } else if (msg.text === COMMAND_UNBAN) {
+                actionMessage = `用户 ID: ${originalUserId} 已被解封.`;
+                blacklistStatus = 0;
+            }
 
-        if (msg.text === COMMAND_BAN) {
-            actionMessage = `用户 ID: ${originalUserId} 已被封禁.`;
-            blacklistStatus = 1;
-        } else if (msg.text === COMMAND_UNBAN) {
-            actionMessage = `用户 ID: ${originalUserId} 已被解封.`;
-            blacklistStatus = 0;
+            if (actionMessage) {
+                const updateQuery = `UPDATE user SET is_blacklisted = ${blacklistStatus} WHERE telegram_id = ?`;
+                db.run(updateQuery, [originalUserId], err => {
+                    const feedback = err ? '发生错误，请稍后重试.' : actionMessage;
+                    bot.sendMessage(chatId, feedback);
+                });
+                return;
+            }
+            bot.sendMessage(originalUserId, `<b>${msg.text}</b>`, { parse_mode: 'HTML' });
+        } else if (msg.photo) {
+            const fileId = msg.photo[msg.photo.length - 1].file_id;
+            bot.sendPhoto(originalUserId, fileId, { caption: msg.caption })
+        } else if (msg.document) {
+            const fileId = msg.document.file_id;
+            bot.sendDocument(originalUserId, fileId, { caption: msg.caption })
+        } else if (msg.video) {
+            const fileId = msg.video.file_id;
+            bot.sendVideo(originalUserId, fileId, { caption: msg.caption })
+            bot.sendVideo(originalUserId, fileId)
+        }else if (msg.audio) {
+            const fileId = msg.audio.file_id;
+            bot.sendAudio(originalUserId, fileId, { caption: msg.caption })
         }
-
-        if (actionMessage) {
-            const updateQuery = `UPDATE user SET is_blacklisted = ${blacklistStatus} WHERE telegram_id = ?`;
-            db.run(updateQuery, [originalUserId], err => {
-                const feedback = err ? '发生错误，请稍后重试.' : actionMessage;
-                bot.sendMessage(chatId, feedback);
-            });
-            return;
-        }
-
-        bot.sendMessage(originalUserId, `<b>${msg.text}</b>`, { parse_mode: 'HTML' });
         return;
     }
 
@@ -112,7 +124,6 @@ bot.on('message', (msg) => {
         }
     });
 });
-
 
 function isUserBlacklisted(telegramId, callback) {
     const query = 'SELECT is_blacklisted FROM user WHERE telegram_id = ?';
