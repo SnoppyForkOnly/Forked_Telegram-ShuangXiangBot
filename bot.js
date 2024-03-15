@@ -23,50 +23,56 @@ bot.on('message', (msg) => {
     const { id: chatId, type: chatType, title: groupName } = msg.chat;
     const { id: telegramId, username: telegramName } = msg.from;
 
-    if ('/start'.includes(msg.text)) {
-        if (chatId != ADMIN_ID) {
-            const message = `${WELCOME_MESSGAE}`;
-            bot.sendMessage(chatId, message, { parse_mode: 'HTML' });
+    if (msg.text != null) {
+        if ('/start'.includes(msg.text)) {
+            if (chatId != ADMIN_ID) {
+                const message = `${WELCOME_MESSGAE}`;
+                bot.sendMessage(chatId, message, { parse_mode: 'HTML' });
+            }
+            return;
         }
-        return;
-    }
 
-    if (msg.text.startsWith(COMMAND_SEND)) {
-        const parts = msg.text.split(' ');
-        const args = parts.slice(1);
-        if (chatId == ADMIN_ID) {
-            if (args.length < 1) {
-                const errorMessage = `参数错误，正确格式为：${COMMAND_SEND} + 消息`;
-                bot.sendMessage(chatId, errorMessage);
-            } else {
-                db.all('SELECT telegram_id FROM user', (err, rows) => {
-                    if (err) {
-                        console.error('查询数据库时出错:', err);
-                        return;
-                    }
-                    rows.forEach((row) => {
-                        const userId = row.telegram_id;
-                        if(userId != ADMIN_ID){
-                            sendMessageToUser(userId, args.join(' '));
+        if (msg.text.startsWith(COMMAND_SEND)) {
+            const parts = msg.text.split(' ');
+            const args = parts.slice(1);
+
+            if (chatId == ADMIN_ID) {
+                if (args.length < 1) {
+                    const errorMessage = `参数错误，正确格式为：${COMMAND_SEND} + 消息`;
+                    bot.sendMessage(chatId, errorMessage);
+                } else {
+                    db.all('SELECT telegram_id FROM user', (err, rows) => {
+                        if (err) {
+                            console.error('查询数据库时出错:', err);
+                            return;
                         }
+                        rows.forEach((row) => {
+                            const userId = row.telegram_id;
+                            if (userId != ADMIN_ID) {
+                                sendMessageToUser(userId, args.join(' '));
+                            }
+                        });
                     });
-                });
+                }
             }
         }
-    }
-    
-    if (['/ID', '/id'].includes(msg.text)) {
-        const message = (chatType === 'group' || chatType === 'supergroup') ?
-            `群组用户名: <b>${groupName}</b>\n群组ID: <b>${chatId}</b>` :
-            `电报用户名: <b>${telegramName}</b>\n电报ID: <b>${telegramId}</b>`;
-        bot.sendMessage(chatId, message, { parse_mode: 'HTML' });
-        return;
+
+
+        if (['/ID', '/id'].includes(msg.text)) {
+            const message = (chatType === 'group' || chatType === 'supergroup') ?
+                `群组用户名: <b>${groupName}</b>\n群组ID: <b>${chatId}</b>` :
+                `电报用户名: <b>${telegramName}</b>\n电报ID: <b>${telegramId}</b>`;
+            bot.sendMessage(chatId, message, { parse_mode: 'HTML' });
+            return;
+        }
+
     }
 
     const insertQuery = `INSERT OR IGNORE INTO user (telegram_id, telegram_name, is_blacklisted) VALUES (?, ?, 0)`;
     if (chatId != ADMIN_ID) {
         db.run(insertQuery, [telegramId, telegramName], err => err && console.error('插入数据库时出错:', err));
     }
+
 
     if (chatId == ADMIN_ID && msg.reply_to_message && msg.reply_to_message.forward_from) {
         const originalUserId = msg.reply_to_message.forward_from.id;
@@ -94,6 +100,7 @@ bot.on('message', (msg) => {
         return;
     }
 
+
     isUserBlacklisted(telegramId, (err, blacklisted) => {
         if (err) {
             console.error('查询黑名单状态时出错:', err);
@@ -105,6 +112,7 @@ bot.on('message', (msg) => {
         }
     });
 });
+
 
 function isUserBlacklisted(telegramId, callback) {
     const query = 'SELECT is_blacklisted FROM user WHERE telegram_id = ?';
