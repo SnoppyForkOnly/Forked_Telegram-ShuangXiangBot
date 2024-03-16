@@ -104,7 +104,6 @@ bot.on('message', (msg) => {
         } else if (msg.video) {
             const fileId = msg.video.file_id;
             bot.sendVideo(originalUserId, fileId, { caption: msg.caption })
-            bot.sendVideo(originalUserId, fileId)
         }else if (msg.audio) {
             const fileId = msg.audio.file_id;
             bot.sendAudio(originalUserId, fileId, { caption: msg.caption })
